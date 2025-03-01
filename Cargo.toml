@@ -1,0 +1,23 @@
+[package]
+name = "np-bot"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rand = "0.9.0"
+
+tokio = { version = "1.41.1", features = [ "full" ]}
+futures = "0.3.31"
+
+reqwest = { version = "0.12.12", features = [ "multipart" ]}
+irc = "1.0.0"
+
+sha256 = "1.5.0"
+json = "0.12.4"
+
+log = "0.4.26"
+simple_logger = "5.0.0"
+
+np_utils = { path = "../np-utils" } 
+np_tarot = { path = "../np-tarot" } 
+

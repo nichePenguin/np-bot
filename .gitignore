@@ -1,0 +1,6 @@
+/target
+affinity.csv
+history.csv
+ircconfig.json
+build.sh
+deploy.sh
