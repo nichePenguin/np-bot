@@ -44,10 +44,12 @@ pub struct ChannelConfig {
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum FeatureKey {
+    Any,
     Full,
     Tarot,
-    Hmm,
+    Hmmm,
     Rice,
+    Np,
     Unknown(String)
 }
 
@@ -56,7 +58,8 @@ fn parse_feature(string: &str) -> FeatureKey {
         "full" => FeatureKey::Full,
         "tarot" => FeatureKey::Tarot,
         "rice" => FeatureKey::Rice,
-        "hmm" => FeatureKey::Hmm,
+        "hmm" => FeatureKey::Hmmm,
+        "np" => FeatureKey::Np,
         _ => {
             log::warn!("Parsing unknown feature: {}", string);
             FeatureKey::Unknown(string.to_owned())
