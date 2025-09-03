@@ -61,6 +61,7 @@ fn parse_feature(string: &str) -> FeatureKey {
         "rice" => FeatureKey::Rice,
         "hmm" => FeatureKey::Hmmm,
         "np" => FeatureKey::Np,
+        "voidstranger" => FeatureKey::VoidStranger,
         _ => {
             log::warn!("Parsing unknown feature: {}", string);
             FeatureKey::Unknown(string.to_owned())
