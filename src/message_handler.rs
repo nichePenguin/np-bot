@@ -11,6 +11,7 @@ enum ParsedMessage {
     Rice,
     Tarot,
     Hmmm,
+    VoidStranger,
     Np(Vec<String>),
     Ignore,
     Exit
@@ -22,6 +23,8 @@ fn parse(input: &Message, ctx: &Context) -> (ParsedMessage, Option<String>, Opti
             (ParsedMessage::Rice, Some(FeatureKey::Rice))
         } else if text.starts_with("!draw") {
             (ParsedMessage::Tarot, Some(FeatureKey::Tarot))
+        } else if text.starts_with("!voidstranger") {
+            (ParsedMessage::VoidStranger, Some(FeatureKey::VoidStranger))
         } else if text.starts_with("hmmm") {
             (ParsedMessage::Hmmm, Some(FeatureKey::Hmmm))
         } else if text.starts_with("!np") {
@@ -71,6 +74,7 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
             return Ok(true);
         },
         ParsedMessage::Ignore => {},
+        ParsedMessage::VoidStranger => ctx.reply_or_send(input, "[💚] store.steampowered.com/app/2121980").await?,
         ParsedMessage::Rice => ctx.reply_or_send(input, "[💚] RICE BURNED TO CHARCOAL!!!").await?,
         ParsedMessage::Hmmm => ctx.reply_or_send(input, "[💚] limesHmm").await?,
         ParsedMessage::Tarot => {

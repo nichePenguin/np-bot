@@ -49,6 +49,7 @@ pub enum FeatureKey {
     Tarot,
     Hmmm,
     Rice,
+    VoidStranger,
     Np,
     Unknown(String)
 }
