@@ -30,6 +30,7 @@ fn parse(input: &Message, ctx: &Context) -> (ParsedMessage, Option<String>, Opti
                 .map(|s| s.to_owned())
                 .collect()), Some(FeatureKey::Np))
         } else if text.starts_with(ctx.safe_word.as_str()) {
+            log::info!("Secret word red");
             (ParsedMessage::Exit, Some(FeatureKey::Any))
         } else {
             (ParsedMessage::Ignore, None)
@@ -59,8 +60,17 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
     }
     let channel = channel.unwrap();
     match parsed {
-        ParsedMessage::Exit => return Ok(true),
-        ParsedMessage::Ignore => return Ok(false),
+        ParsedMessage::Exit => {
+            let username = get_message_tag(&input, "display-name").unwrap_or("unknown".to_owned());
+            if username != "nichePenguin" {
+                log::info!("Good one, {}!", username);
+                ctx.reply_or_send(input, "Good one!").await?
+            } else {
+                ctx.reply_or_send(input, "Bye, boss!").await?
+            }
+            return Ok(true);
+        },
+        ParsedMessage::Ignore => {},
         ParsedMessage::Rice => ctx.reply_or_send(input, "[💚] RICE BURNED TO CHARCOAL!!!").await?,
         ParsedMessage::Hmmm => ctx.reply_or_send(input, "[💚] limesHmm").await?,
         ParsedMessage::Tarot => {

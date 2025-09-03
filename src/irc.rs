@@ -1,4 +1,5 @@
 use futures::prelude::*;
+use futures::stream::FusedStream;
 use irc::client::prelude::{
     Config as IrcConfig,
     Capability, Command, Message, Client
@@ -97,7 +98,9 @@ pub async fn connect(
 
     for channel in &main_config.channels {
         if channel.active {
-            client.send_join(&channel.name);
+            if let Err(e) = client.send_join(&channel.name) {
+                log::error!("Error joining channel {}: {}", &channel.name, e)
+            }
         }
     }
 
@@ -140,12 +143,17 @@ pub async fn connect(
             }
             let exit = handle(message, &ctx).await.map_err(|e| format!("Error handling message: {}", e))?;
             if exit {
+                log::info!("Received exit request on handle");
                 break;
             }
         }
         log::info!("IRC loop exiting...");
         ctx.queue.stop_loop();
-        Ok(())
+        if stream.is_terminated() {
+            Err("Client stream terminated without a command, will retry".into())
+        } else {
+            Ok(())
+        }
     }))
 }
 
@@ -160,12 +168,18 @@ fn update_config(
     if to_join.len() != 0 || to_part.len() != 0 {
         let client = client.lock().map_err(|e| format!("Failed to obtain client lock: {}", e))?;
         for part in to_part {
+            let part = part.to_string();
             log::debug!("PART {}", part);
-            client.send_part(part.to_string());
+            if let Err(e) = client.send_part(&part) {
+                log::error!("Error parting from {}: {}", part, e)
+            }
         }
         for join in to_join {
+            let join = join.to_string();
             log::debug!("JOIN {}", join);
-            client.send_join(join.to_string());
+            if let Err(e) = client.send_join(&join) {
+                log::error!("Error joining to {}: {}", join, e)
+            }
         }
     }
     *config = new_config;

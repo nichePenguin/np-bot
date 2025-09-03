@@ -3,6 +3,4 @@ affinity.csv
 history.csv
 ircconfig.json
 noted_users.txt
-build.sh
-deploy.sh
-run.sh
+*.sh

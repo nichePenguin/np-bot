@@ -60,7 +60,9 @@ async fn get_last_message(last_message: &Arc<Mutex<Instant>>) -> Instant {
 
 impl MessageQueue {
     pub async fn send(&self, message: Message) {
-        self.sender.send(message).await;
+        if let Err(e) = self.sender.send(message).await {
+            log::error!("Error sending message: {}", e);
+        }
     }
 
     pub async fn reset_delay(&self) {
