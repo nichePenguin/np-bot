@@ -55,18 +55,30 @@ impl Context {
         if let FeatureKey::Any = key {
             return true;
         }
+
         let config = self.config.lock();
         if let Err(e) = &config {
             log::error!("Failed to get config lock, assuming feature disabled: {}", e);
         }
         let config = config.unwrap();
+
+        fn contains_negative(key: &FeatureKey, channel_config: &config::ChannelConfig) -> bool {
+            channel_config.features.iter().any(|config_key| 
+                if let FeatureKey::Not(not_key) = config_key {
+                    *key == **not_key
+                } else {
+                    false
+                })
+        }
+
         if let Some(channel_config) = config.channels.iter().find(|c| c.name == channel) {
-            channel_config.features.contains(&FeatureKey::Full) 
-            || channel_config.features.contains(&key)
+            !contains_negative(&key, channel_config) && (
+                channel_config.features.contains(&FeatureKey::Full)
+                || channel_config.features.contains(&key))
         } else {
             false
         }
-    } 
+    }
 }
 
 pub async fn connect(

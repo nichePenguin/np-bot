@@ -51,10 +51,20 @@ pub enum FeatureKey {
     Rice,
     VoidStranger,
     Np,
-    Unknown(String)
+    Not(Box<FeatureKey>),
+    Unknown(String),
 }
 
 fn parse_feature(string: &str) -> FeatureKey {
+    if string.starts_with("!") {
+        let parsed = parse_feature(&string[1..]);
+        // Double negation supported :D
+        return if let FeatureKey::Not(parsed) = parsed {
+            *parsed
+        } else {
+            FeatureKey::Not(Box::new(parse_feature(&string[1..])))
+        }
+    }
     match string {
         "full" => FeatureKey::Full,
         "tarot" => FeatureKey::Tarot,
