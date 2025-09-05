@@ -85,7 +85,7 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
             let username = get_message_tag(&input, "display-name").unwrap_or("unknown".to_owned());
             let (count, example) = ctx.swords.check(&username).await.map_err(|e| e.to_string())?;
             let message = if example.is_some() {
-                format!("[💚] You drew {} swords from your armory, for example {}", count, example.unwrap())
+                format!("[💚] Your armory boasts {} swords, for example {}", count, example.unwrap())
             } else {
                 format!("[💚] You've yet drew no swords...")
             };
