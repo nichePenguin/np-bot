@@ -11,6 +11,7 @@ const HISTORY_SEPARATOR: &str = ",";
 enum ParsedMessage {
     Rice,
     Tarot,
+    Armory,
     Hmmm,
     VoidStranger,
     Np(Vec<String>),
@@ -22,6 +23,8 @@ fn parse(input: &Message, ctx: &Context) -> (ParsedMessage, Option<String>, Opti
     if let Command::PRIVMSG(channel, text) = &input.command {
         let (parsed, key) = if text.starts_with("!rice") {
             (ParsedMessage::Rice, Some(FeatureKey::Rice))
+        } else if text.starts_with("!armory") {
+            (ParsedMessage::Armory, Some(FeatureKey::Tarot))
         } else if text.starts_with("!draw") {
             (ParsedMessage::Tarot, Some(FeatureKey::Tarot))
         } else if text.starts_with("!voidstranger") {
@@ -78,12 +81,24 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
         ParsedMessage::VoidStranger => ctx.reply_or_send(input, "[💚] store.steampowered.com/app/2121980").await?,
         ParsedMessage::Rice => ctx.reply_or_send(input, "[💚] RICE BURNED TO CHARCOAL!!!").await?,
         ParsedMessage::Hmmm => ctx.reply_or_send(input, "[💚] limesHmm").await?,
+        ParsedMessage::Armory => {
+            let username = get_message_tag(&input, "display-name").unwrap_or("unknown".to_owned());
+            let (count, example) = ctx.swords.check(&username).await.map_err(|e| e.to_string())?;
+            let message = if example.is_some() {
+                format!("You drew {} swords from you armory, for example {}", count, example.unwrap())
+            } else {
+                format!("You've yet drew no swords...")
+            };
+            log::info!("{}: {}", channel, message);
+            ctx.reply_or_send(input, message.as_str()).await?;
+            return Ok(false);
+        },
         ParsedMessage::Tarot => {
             let username = get_message_tag(&input, "display-name").unwrap_or("unknown".to_owned());
             if rand::rng().random::<u8>() >= (255 - 32) {
                 let sword = ctx.swords.draw(&username).await.map_err(|e| e.to_string())?;
                 let message = format!("{} drew a sword, en garde! It's {}", username, sword);
-                log::info!("{}", message);
+                log::info!("{}: {}", channel, message);
                 ctx.reply_or_send(input, message.as_str()).await?;
                 ctx.swords.log(sword).await.map_err(|e| e.to_string())?;
                 return Ok(false);

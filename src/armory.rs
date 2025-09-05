@@ -3,7 +3,7 @@ use std::error::Error;
 use std::path::PathBuf;
 
 use std::io::{BufReader, BufRead, Write};
-use std::fs::{File, OpenOptions};
+use std::fs::{File, OpenOptions, self};
 
 use cruet::to_title_case;
 use tokio::sync::RwLock;
@@ -16,20 +16,15 @@ const LANG_SIZE: usize = 2222;
 const SEPARATOR: &str = "|";
 
 pub struct Swords {
-    swords: RwLock<File>,
+    swords: RwLock<PathBuf>,
     elven: PathBuf
 }
 
 impl Swords {
     pub async fn new(swords: PathBuf, elven: PathBuf) -> Result<Self, Box<dyn Error + Send + Sync>> {
-        let file = OpenOptions::new()
-            .write(true)
-            .append(true)
-            .open(swords)?;
-
         Ok(Self {
             elven,
-            swords: RwLock::new(file)
+            swords: RwLock::new(swords)
         })
     }
 
@@ -55,28 +50,46 @@ impl Swords {
 
     async fn is_unique(&self, sword: &Sword) -> Result<bool, Box<dyn Error + Send + Sync>> {
         let swords = self.swords.read().await;
-        for (n, sword_db) in BufReader::new(&*swords).lines().enumerate() {
-            if let Ok(sword_db) = sword_db {
-                match Sword::deserialize(sword_db) {
-                    Ok(sword_db) => {
-                        if sword_db == *sword {
-                            return Ok(false)
-                        }
-                    }
-                    Err(e) => {
-                        log::error!("Error parsing sword at {}: {}", n, e);
+        for (n, sword_db) in fs::read_to_string(&*swords)?.lines().enumerate() {
+            match Sword::deserialize(sword_db) {
+                Ok(sword_db) => {
+                    if sword_db == *sword {
+                        return Ok(false)
                     }
                 }
-            } else {
-                return Ok(false)
+                Err(e) => {
+                    log::error!("Error parsing sword at {}: {}", n, e);
+                }
             }
         }
         Ok(true)
     }
 
     pub async fn log(&self, sword: Sword) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let mut file = self.swords.write().await;
+        let swords = self.swords.write().await;
+        let mut file = OpenOptions::new()
+            .write(true)
+            .append(true)
+            .open(&*swords)?;
+
         writeln!(file, "{}", sword.serialize()).map_err(|e| e.to_string().into())
+    }
+
+    pub async fn check(&self, owner: &String) -> Result<(usize, Option<Sword>), Box<dyn Error + Send + Sync>> {
+        let swords = {
+            let swords = self.swords.read().await;
+            fs::read_to_string(&*swords)?
+                .lines()
+                .filter_map(|line| Sword::deserialize(line).ok())
+                .filter(|sword| sword.owner == *owner)
+                .collect::<Vec<Sword>>()
+        };
+        if swords.len() == 0 {
+            return Ok((0, None));
+        }
+        let index = rand::random_range(0..swords.len());
+        let example = swords[index].clone();
+        Ok((swords.len(), Some(example)))
     }
 
     pub async fn draw(&self, owner: &String) -> Result<Sword, Box<dyn Error + Send + Sync>> {
@@ -132,7 +145,7 @@ impl Swords {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 enum Material {
     Plastic,
     Glass,
@@ -192,7 +205,7 @@ impl Material {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 enum Quality {
     Common,
     WellCrafted,
@@ -233,7 +246,7 @@ impl Quality {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 enum SwordType {
     ShortSword,
     LongSword,
@@ -376,6 +389,7 @@ impl fmt::Display for Material {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Sword {
     material: Material,
     handle: Material,
@@ -411,7 +425,7 @@ impl Sword {
         ].join(SEPARATOR)
     }
 
-    pub fn deserialize(string: String) -> Result<Sword, Box<dyn Error + Send + Sync>> {
+    pub fn deserialize(string: &str) -> Result<Sword, Box<dyn Error + Send + Sync>> {
         let mut data = string.split(SEPARATOR);
         Ok(Sword {
             material: Material::parse(data.next())?,
