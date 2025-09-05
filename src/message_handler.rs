@@ -81,7 +81,7 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
         ParsedMessage::Hmmm => ctx.reply_or_send(input, "[💚] limesHmm").await?,
         ParsedMessage::Tarot => {
             let username = get_message_tag(&input, "display-name").unwrap_or("unknown".to_owned());
-            if rand::rng().random::<u8>() > (255 - 8) {
+            if rand::rng().random::<u8>() >= (255 - 16) {
                 let sword = draw(&mut rand::rng());
                 let message = format!("{} drew a sword, en garde! It's {}", username, sword);
                 log::info!("{}", message);
