@@ -85,9 +85,9 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
             let username = get_message_tag(&input, "display-name").unwrap_or("unknown".to_owned());
             let (count, example) = ctx.swords.check(&username).await.map_err(|e| e.to_string())?;
             let message = if example.is_some() {
-                format!("You drew {} swords from you armory, for example {}", count, example.unwrap())
+                format!("[💚] You drew {} swords from your armory, for example {}", count, example.unwrap())
             } else {
-                format!("You've yet drew no swords...")
+                format!("[💚] You've yet drew no swords...")
             };
             log::info!("{}: {}", channel, message);
             ctx.reply_or_send(input, message.as_str()).await?;
@@ -97,7 +97,7 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
             let username = get_message_tag(&input, "display-name").unwrap_or("unknown".to_owned());
             if rand::rng().random::<u8>() >= (255 - 32) {
                 let sword = ctx.swords.draw(&username).await.map_err(|e| e.to_string())?;
-                let message = format!("{} drew a sword, en garde! It's {}", username, sword);
+                let message = format!("[💚] {} drew a sword, en garde! It's {}", username, sword);
                 log::info!("{}: {}", channel, message);
                 ctx.reply_or_send(input, message.as_str()).await?;
                 ctx.swords.log(sword).await.map_err(|e| e.to_string())?;
