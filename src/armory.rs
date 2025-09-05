@@ -88,7 +88,7 @@ impl Distribution<Quality> for StandardUniform {
 
 impl Distribution<Material> for StandardUniform {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Material {
-        match rng.random_range(0..=22) {
+        match rng.random_range(0..=21) {
             0 => Material::Plastic,
             1 => Material::Glass,
             2 => Material::Wood,
@@ -110,8 +110,7 @@ impl Distribution<Material> for StandardUniform {
             18 => Material::Sapphire,
             19 => Material::Emerald,
             20 => Material::Diamond,
-            21 => Material::Adamantine,
-            _ => panic!()
+            _ => Material::Adamantine,
         }
     }
 }
