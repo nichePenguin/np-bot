@@ -16,7 +16,8 @@ use np_utils::get_env_var;
 const RETRY_DELAY_MS: u64 = 1000;
 const HISTORY_FILE: &str = "history.csv";
 const USERS_FILE: &str = "noted_users.txt";
-const SWORDS_FILE: &str = "sword_wielders.txt";
+const SWORDS_FILE: &str = "swords.txt";
+const ELVEN_FILE: &str = "language_elven.txt";
 const AFFINITY_FILE: &str = "affinity.csv";
 const CONFIG_FILE: &str = "ircconfig.json";
 
@@ -79,9 +80,12 @@ async fn connect() -> Result<tokio::task::JoinHandle<Result<(), Box<dyn Error + 
     let affinity_file = get_env_var("NPBOT_AFFINITY", AFFINITY_FILE);
     let tarot_provider = np_tarot::Tarot::new(PathBuf::from(affinity_file))?;
 
+    let elven = get_env_var("NPBOT_ELVEN", ELVEN_FILE);
+    let swords = get_env_var("NPBOT_SWORDS", SWORDS_FILE);
+    let sword_provider = armory::Swords::new(PathBuf::from(swords), PathBuf::from(elven)).await.map_err(|e| e.to_string())?;
+
     let history_file = get_env_var("NPBOT_HISTORY", HISTORY_FILE);
     let noted_users = get_env_var("NPBOT_USERS", USERS_FILE);
-    let sword_wielders = get_env_var("NPBOT_SWORDS", SWORDS_FILE);
     let config_file = get_env_var("NPBOT_CONFIG", CONFIG_FILE);
 
     irc::connect(
@@ -90,6 +94,6 @@ async fn connect() -> Result<tokio::task::JoinHandle<Result<(), Box<dyn Error + 
         PathBuf::from(config_file),
         PathBuf::from(history_file),
         PathBuf::from(noted_users),
-        PathBuf::from(sword_wielders),
+        sword_provider,
         tarot_provider).await
 }

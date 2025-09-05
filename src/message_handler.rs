@@ -4,7 +4,6 @@ use std::error::Error;
 use irc::client::prelude::{Message, Command};
 use crate::config::FeatureKey;
 use crate::irc::Context;
-use crate::armory::draw;
 use rand::prelude::*;
 
 const HISTORY_SEPARATOR: &str = ",";
@@ -82,11 +81,11 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
         ParsedMessage::Tarot => {
             let username = get_message_tag(&input, "display-name").unwrap_or("unknown".to_owned());
             if rand::rng().random::<u8>() >= (255 - 16) {
-                let sword = draw(&mut rand::rng());
+                let sword = ctx.swords.draw(&username).await.map_err(|e| e.to_string())?;
                 let message = format!("{} drew a sword, en garde! It's {}", username, sword);
                 log::info!("{}", message);
                 ctx.reply_or_send(input, message.as_str()).await?;
-                np_utils::log_line(&ctx.sword_wielders, message, 1000)?;
+                ctx.swords.log(sword).await.map_err(|e| e.to_string())?;
                 return Ok(false);
             }
             let card = ctx.tarot.draw();

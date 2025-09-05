@@ -11,17 +11,17 @@ use std::{
     path::PathBuf
 };
 
-
+use crate::armory::Swords;
 use crate::config::{self, Config, FeatureKey};
 use crate::message_handler::handle;
 use crate::message_queue;
 
 pub struct Context {
     queue: Arc<message_queue::MessageQueue>,
+    pub swords: Swords,
     pub tarot: np_tarot::Tarot,
     pub tarot_history: PathBuf,
     pub noted_users: PathBuf,
-    pub sword_wielders: PathBuf,
     pub safe_word: String,
     config: Arc<Mutex<Config>>
 }
@@ -88,7 +88,7 @@ pub async fn connect(
     config_path: PathBuf,
     tarot_history: PathBuf,
     noted_users: PathBuf,
-    sword_wielders: PathBuf,
+    swords: Swords,
     tarot: np_tarot::Tarot) -> Result<tokio::task::JoinHandle<Result<(), Box<dyn Error + Send + Sync>>>, Box<dyn Error>>
 {
     let config = IrcConfig {
@@ -126,10 +126,10 @@ pub async fn connect(
     let queue = Arc::new(message_queue::start(client, 850).await);
     let ctx = Context {
         queue,
+        swords,
         tarot,
         tarot_history,
         noted_users,
-        sword_wielders,
         safe_word,
         config: config_ref
     };

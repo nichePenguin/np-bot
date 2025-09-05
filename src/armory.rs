@@ -1,9 +1,138 @@
 use std::fmt;
+use std::error::Error;
+use std::path::PathBuf;
+
+use std::io::{BufReader, BufRead, Write};
+use std::fs::{File, OpenOptions};
+
+use cruet::to_title_case;
+use tokio::sync::RwLock;
 use rand::{
     distr::{Distribution, StandardUniform},
-    Rng,
+    Rng
 };
 
+const LANG_SIZE: usize = 2222;
+const SEPARATOR: &str = "|";
+
+pub struct Swords {
+    swords: RwLock<File>,
+    elven: PathBuf
+}
+
+impl Swords {
+    pub async fn new(swords: PathBuf, elven: PathBuf) -> Result<Self, Box<dyn Error + Send + Sync>> {
+        let file = OpenOptions::new()
+            .write(true)
+            .append(true)
+            .open(swords)?;
+
+        Ok(Self {
+            elven,
+            swords: RwLock::new(file)
+        })
+    }
+
+    fn roll_sword(&self, owner: &String, guarantee_artifact: bool) -> Sword {
+        let quality = if guarantee_artifact {
+            Quality::Artifact
+        } else {
+            rand::random()
+        };
+        let handle = match quality {
+            Quality::Common => Material::Wood,
+            _ => rand::random()
+        };
+
+        Sword {
+            material: rand::random(),
+            sword_type: rand::random(),
+            name: None,
+            real_name: None,
+            handle, quality, owner: owner.clone()
+        }
+    }
+
+    async fn is_unique(&self, sword: &Sword) -> Result<bool, Box<dyn Error + Send + Sync>> {
+        let swords = self.swords.read().await;
+        for (n, sword_db) in BufReader::new(&*swords).lines().enumerate() {
+            if let Ok(sword_db) = sword_db {
+                match Sword::deserialize(sword_db) {
+                    Ok(sword_db) => {
+                        if sword_db == *sword {
+                            return Ok(false)
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("Error parsing sword at {}: {}", n, e);
+                    }
+                }
+            } else {
+                return Ok(false)
+            }
+        }
+        Ok(true)
+    }
+
+    pub async fn log(&self, sword: Sword) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let mut file = self.swords.write().await;
+        writeln!(file, "{}", sword.serialize()).map_err(|e| e.to_string().into())
+    }
+
+    pub async fn draw(&self, owner: &String) -> Result<Sword, Box<dyn Error + Send + Sync>> {
+        let mut sword = self.roll_sword(owner, false);
+        if let Quality::Artifact = sword.quality {
+            let res = self.bestow_name(&mut sword);
+            if res.is_err() || rand::random::<u8>() == 255 {
+                if res.is_err() {
+                    log::error!("Failed to bestow a name: {}", res.err().unwrap());
+                }
+                log::info!("{} receives the rarest of gifts...", owner);
+                let name = format!("{:#010X}", rand::random::<u32>());
+                sword.name = Some(name);
+            }
+
+            while self.is_unique(&sword).await? {
+                sword = self.roll_sword(owner, true);
+            }
+        }
+        Ok(sword)
+    }
+
+    fn bestow_name(&self, sword: &mut Sword) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let i1 = rand::random_range(0..LANG_SIZE);
+        let mut i2 = rand::random_range(0..LANG_SIZE);
+        while i2 == i1 {
+            i2 = rand::random_range(0..LANG_SIZE);
+        }
+        let file = File::open(&self.elven)?;
+        let mut first = None;
+        let mut second = None;
+        for (i, line) in BufReader::new(file).lines().enumerate() {
+            if i == i1 || i == i2 {
+                let line = line?;
+                let mut word = line.split_whitespace();
+                let word = (
+                    word.next().ok_or("Error obtaining regular word")?.to_owned(),
+                    word.next().ok_or("Error obtaining elven word")?.to_owned()
+                );
+                if first.is_none() {
+                    first = Some(word)
+                } else {
+                    second = Some(word)
+                }
+            }
+        }
+        let first = first.unwrap();
+        let second = second.unwrap();
+
+        sword.name = Some(to_title_case(format!("{}{}", first.1, second.1).as_str()));
+        sword.real_name = Some(to_title_case(format!("{}{}", first.0, second.0).as_str()));
+        Ok(())
+    }
+}
+
+#[derive(PartialEq)]
 enum Material {
     Plastic,
     Glass,
@@ -29,6 +158,41 @@ enum Material {
     Adamantine
 }
 
+impl Material {
+    pub fn parse(string: Option<&str>) -> Result<Material, Box<dyn Error + Send + Sync>> {
+        if string.is_none() {
+            return Err("Undefined material".into());
+        }
+        let string = string.unwrap();
+        match string {
+            "plastic" => Ok(Material::Plastic),
+            "glass" => Ok(Material::Glass),
+            "wood" => Ok(Material::Wood),
+            "fine porcelain" => Ok(Material::Porcelain),
+            "iron" => Ok(Material::Iron),
+            "steel" => Ok(Material::Steel),
+            "silver" => Ok(Material::Silver),
+            "gold" => Ok(Material::Gold),
+            "electrum" => Ok(Material::Electrum),
+            "rose gold" => Ok(Material::RoseGold),
+            "lead" => Ok(Material::Lead),
+            "tin" => Ok(Material::Tin),
+            "copper" => Ok(Material::Copper),
+            "bronze" => Ok(Material::Bronze),
+            "brass" => Ok(Material::Brass),
+            "zinc" => Ok(Material::Zinc),
+            "mithril" => Ok(Material::Mithril),
+            "ruby" => Ok(Material::Ruby),
+            "sapphire" => Ok(Material::Sapphire),
+            "emerald" => Ok(Material::Emerald),
+            "diamond" => Ok(Material::Diamond),
+            "adamantine" => Ok(Material::Adamantine),
+            _ => Err(format!("Unknown material: {}", string).into()),
+        }
+    }
+}
+
+#[derive(PartialEq)]
 enum Quality {
     Common,
     WellCrafted,
@@ -39,6 +203,37 @@ enum Quality {
     Artifact,
 }
 
+impl Quality {
+    pub fn to_mark(&self) -> &str {
+        match self {
+            Quality::Common => " ",
+            Quality::WellCrafted => "-",
+            Quality::Fine => "+",
+            Quality::Superior => "*",
+            Quality::Exceptional => "≡",
+            Quality::Masterful => "☼",
+            Quality::Artifact => "?",
+        }
+    }
+    pub fn parse(string: Option<&str>) -> Result<Self, Box<dyn Error + Send + Sync>> {
+        if string.is_none() {
+            return Err("Undefined quality".into());
+        }
+        let string = string.unwrap();
+        match string {
+            " " => Ok(Quality::Common),
+            "-" => Ok(Quality::WellCrafted),
+            "+" => Ok(Quality::Fine),
+            "*" => Ok(Quality::Superior),
+            "≡" => Ok(Quality::Exceptional),
+            "☼" => Ok(Quality::Masterful),
+            "?" => Ok(Quality::Artifact),
+            _ => Err(format!("Unknown quality mark: {}", string).into())
+        }
+    }
+}
+
+#[derive(PartialEq)]
 enum SwordType {
     ShortSword,
     LongSword,
@@ -48,6 +243,26 @@ enum SwordType {
     Katana,
     Zweihander,
     Dagger,
+}
+
+impl SwordType {
+    pub fn parse(string: Option<&str>) -> Result<SwordType, Box<dyn Error + Send + Sync>>{
+        if string.is_none() {
+            return Err("Undefined sword type".into());
+        }
+        let string = string.unwrap();
+        match string {
+            "shortsword" => Ok(SwordType::ShortSword),
+            "longsword" => Ok(SwordType::LongSword),
+            "rapier" => Ok(SwordType::Rapier),
+            "cutlass" => Ok(SwordType::Cutlass),
+            "scimitar" => Ok(SwordType::Scimitar),
+            "katana" => Ok(SwordType::Katana),
+            "zweihander" => Ok(SwordType::Zweihander),
+            "dagger" => Ok(SwordType::Dagger),
+            _ => Err(format!("Unknownsword type: {}", string).into()),
+        }
+    }
 }
 
 impl Distribution<SwordType> for StandardUniform {
@@ -166,7 +381,58 @@ pub struct Sword {
     handle: Material,
     sword_type: SwordType,
     quality: Quality,
-    name: Option<String>
+    name: Option<String>,
+    real_name: Option<String>,
+    owner: String
+}
+
+impl Sword {
+    fn parse_name(string: Option<&str>) -> Result<Option<String>, Box<dyn Error + Send + Sync>> {
+        if string.is_none() {
+            return Err("Undefined name string".into());
+        }
+        let string = string.unwrap();
+        if string == "None" {
+            Ok(None)
+        } else {
+            Ok(Some(string.to_owned()))
+        }
+    }
+
+    pub fn serialize(&self) -> String {
+        [
+            self.material.to_string(),
+            self.handle.to_string(),
+            self.sword_type.to_string(),
+            self.quality.to_mark().to_owned(),
+            self.name.clone().unwrap_or("None".to_owned()),
+            self.real_name.clone().unwrap_or("None".to_owned()),
+            self.owner.clone(),
+        ].join(SEPARATOR)
+    }
+
+    pub fn deserialize(string: String) -> Result<Sword, Box<dyn Error + Send + Sync>> {
+        let mut data = string.split(SEPARATOR);
+        Ok(Sword {
+            material: Material::parse(data.next())?,
+            handle: Material::parse(data.next())?,
+            sword_type: SwordType::parse(data.next())?,
+            quality: Quality::parse(data.next())?,
+            name: Self::parse_name(data.next())?,
+            real_name: Self::parse_name(data.next())?,
+            owner: data.next().ok_or("Undefined owner")?.to_owned()
+        })
+    }
+
+}
+
+impl std::cmp::PartialEq for Sword {
+    fn eq(&self, other: &Self) -> bool {
+        self.material == other.material
+            && self.handle == other.handle
+            && self.sword_type == other.sword_type
+            && self.quality == other.quality
+    }
 }
 
 impl fmt::Display for Sword {
@@ -178,33 +444,13 @@ impl fmt::Display for Sword {
             Quality::Superior => format!("a *{} {}* of superior quality", self.material, self.sword_type),
             Quality::Exceptional => format!("an exceptional ≡{} {}≡", self.material, self.sword_type),
             Quality::Masterful => format!("a masterwork ☼{} {}☼", self.material, self.sword_type),
-            Quality::Artifact => 
-                format!("the \"{}\", one of a kind {} {}. All craftsdwarfship is of the highest quality",
-                    self.name.as_ref().unwrap(), self.material, self.sword_type),
+            Quality::Artifact =>
+                format!("The \"{}\" ({}), one of a kind {} {}, is of the highest quality",
+                    self.name.as_ref().unwrap(), self.real_name.as_ref().unwrap(),
+                    self.material, self.sword_type),
         };
 
         let handle = format!("It's handle is made out of {}", self.handle);
         write!(f, "{}. {}.", sword, handle)
-    }
-}
-
-pub fn draw<R: Rng>(rng: &mut R) -> Sword {
-    let quality = rng.random();
-    let handle = if let Quality::Common = quality {
-        Material::Wood
-    } else {
-        rng.random()
-    };
-    let name = if let Quality::Artifact = quality {
-        Some("TODO".to_owned())
-    } else {
-        None
-    };
-    Sword {
-        material: rng.random(),
-        sword_type: rng.random(),
-        handle,
-        quality,
-        name
     }
 }
