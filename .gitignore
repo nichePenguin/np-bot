@@ -2,5 +2,5 @@
 affinity.csv
 history.csv
 ircconfig.json
-noted_users.txt
+*.txt
 *.sh

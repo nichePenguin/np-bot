@@ -21,6 +21,7 @@ pub struct Context {
     pub tarot: np_tarot::Tarot,
     pub tarot_history: PathBuf,
     pub noted_users: PathBuf,
+    pub sword_wielders: PathBuf,
     pub safe_word: String,
     config: Arc<Mutex<Config>>
 }
@@ -87,6 +88,7 @@ pub async fn connect(
     config_path: PathBuf,
     tarot_history: PathBuf,
     noted_users: PathBuf,
+    sword_wielders: PathBuf,
     tarot: np_tarot::Tarot) -> Result<tokio::task::JoinHandle<Result<(), Box<dyn Error + Send + Sync>>>, Box<dyn Error>>
 {
     let config = IrcConfig {
@@ -127,6 +129,7 @@ pub async fn connect(
         tarot,
         tarot_history,
         noted_users,
+        sword_wielders,
         safe_word,
         config: config_ref
     };
