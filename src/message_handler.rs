@@ -80,7 +80,7 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
         ParsedMessage::Ignore => {},
         ParsedMessage::VoidStranger => ctx.reply_or_send(input, "[💚] store.steampowered.com/app/2121980").await?,
         ParsedMessage::Rice => ctx.reply_or_send(input, "[💚] RICE BURNED TO CHARCOAL!!!").await?,
-        ParsedMessage::Hmmm => ctx.reply_or_send(input, "[💚] limesHmm").await?,
+        ParsedMessage::Hmmm => ctx.reply_or_send(input, "[💚] lcolonThinking").await?,
         ParsedMessage::Armory => {
             let username = get_message_tag(&input, "display-name").unwrap_or("unknown".to_owned());
             let (count, example) = ctx.swords.check(&username).await.map_err(|e| e.to_string())?;
