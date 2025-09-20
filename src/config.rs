@@ -50,6 +50,7 @@ pub enum FeatureKey {
     Hmmm,
     Rice,
     VoidStranger,
+    Ping,
     Np,
     Not(Box<FeatureKey>),
     Unknown(String),
@@ -70,6 +71,7 @@ fn parse_feature(string: &str) -> FeatureKey {
         "tarot" => FeatureKey::Tarot,
         "rice" => FeatureKey::Rice,
         "hmm" => FeatureKey::Hmmm,
+        "ping" => FeatureKey::Ping,
         "np" => FeatureKey::Np,
         "voidstranger" => FeatureKey::VoidStranger,
         _ => {

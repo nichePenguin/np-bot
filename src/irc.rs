@@ -144,6 +144,7 @@ pub async fn connect(
 
     Ok(tokio::task::spawn( async move {
         log::info!("IRC loop started");
+        let mut valid_exit = false;
         while let Some(message) = stream.next().await {
             if let Err(e) = message {
                 log::error!("Error receiving message: {}", e);
@@ -159,15 +160,19 @@ pub async fn connect(
             let exit = handle(message, &ctx).await.map_err(|e| format!("Error handling message: {}", e))?;
             if exit {
                 log::info!("Received exit request on handle");
+                valid_exit = true;
                 break;
             }
         }
         log::info!("IRC loop exiting...");
         ctx.queue.stop_loop();
+        if valid_exit {
+            return Ok(())
+        }
         if stream.is_terminated() {
             Err("Client stream terminated without a command, will retry".into())
         } else {
-            Ok(())
+            Err("Loop exited but stream was not terminated".into())
         }
     }))
 }
