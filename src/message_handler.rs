@@ -14,6 +14,7 @@ enum ParsedMessage {
     Armory,
     Hmmm,
     VoidStranger,
+    Needle,
     Ping(String),
     Np(Vec<String>),
     Ignore,
@@ -24,6 +25,8 @@ fn parse(input: &Message, ctx: &Context) -> (ParsedMessage, Option<String>, Opti
     if let Command::PRIVMSG(channel, text) = &input.command {
         let (parsed, key) = if text.starts_with("!rice") {
             (ParsedMessage::Rice, Some(FeatureKey::Rice))
+        } else if text == "!needle" {
+            (ParsedMessage::Needle, Some(FeatureKey::Needle))
         } else if text.starts_with("!ping") {
             (ParsedMessage::Ping(text.clone()), Some(FeatureKey::Ping))
         } else if text.starts_with("!armory") {
@@ -81,6 +84,17 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
             return Ok(true);
         },
         ParsedMessage::Ignore => {},
+        ParsedMessage::Needle => {
+            if rand::rng().random::<u8>() > 250 {
+                let username = get_message_tag(&input, "display-name").unwrap_or("unknown".to_owned());
+                let needle = ctx.swords.draw(&username, true).await.map_err(|e| e.to_string())?;
+                ctx.reply_or_send(input, format!("[💚] You rummage around in a haystack... finding a {}!", needle).as_str()).await?;
+                log::info!("{}: {} found {}", channel, username, &needle);
+                ctx.swords.log(needle).await.map_err(|e| e.to_string())?;
+            } else {
+                ctx.reply_or_send(input, "[💚] You rummage around in a haystack... not finding any needles...").await?
+            }
+        },
         ParsedMessage::Ping(text) => {
             let reply = format!("[💚] pong{}", &text[5..]);
             ctx.reply_or_send(input, reply.as_str()).await?
@@ -109,8 +123,8 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
         ParsedMessage::Tarot => {
             let username = get_message_tag(&input, "display-name").unwrap_or("unknown".to_owned());
             if rand::rng().random::<u8>() >= (255 - 32) {
-                let sword = ctx.swords.draw(&username).await.map_err(|e| e.to_string())?;
-                let message = format!("[💚] {} drew a sword, en garde! It's {}", username, sword);
+                let sword = ctx.swords.draw(&username, false).await.map_err(|e| e.to_string())?;
+                let message = format!("[💚] {} drew a sword, en garde! It's {}.", username, sword);
                 log::info!("{}: {}", channel, message);
                 ctx.reply_or_send(input, message.as_str()).await?;
                 ctx.swords.log(sword).await.map_err(|e| e.to_string())?;
@@ -121,12 +135,7 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
                 log::error!("Error drawing a card for {}: {}", input.source_nickname().unwrap_or("unknown"), e);
                 return Err(e);
             }
-
-            let (mut card, affinity) = card.map_err(|e| format!("Error drawing card: {}", e))?;
-            if username == "loweffortzzz" {
-                card = "0: The Fool".to_string();
-            }
-
+            let (card, affinity) = card.map_err(|e| format!("Error drawing card: {}", e))?;
             let color = get_message_tag(&input, "color").unwrap_or("#FFFFFF".to_owned());
             let user_id = get_message_tag(&input, "user-id").unwrap_or("unknown".to_owned());
             if let Err(e) = log_card(

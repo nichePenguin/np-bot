@@ -28,20 +28,26 @@ impl Swords {
         })
     }
 
-    fn roll_sword(&self, owner: &String, guarantee_artifact: bool) -> Sword {
+    fn roll_sword(&self, owner: &String, guarantee_artifact: bool, needle: bool) -> Sword {
         let quality = if guarantee_artifact {
             Quality::Artifact
         } else {
             rand::random()
         };
-        let handle = match quality {
-            Quality::Common => Material::Wood,
-            _ => rand::random()
+        let material = rand::random::<Material>();
+        let (sword_type, handle) = if needle {
+            (SwordType::Needle, material.clone())
+        } else {
+            let handle = match quality {
+                Quality::Common => Material::Wood,
+                _ => rand::random()
+            };
+            (rand::random(), handle)
         };
 
         Sword {
-            material: rand::random(),
-            sword_type: rand::random(),
+            material,
+            sword_type,
             name: None,
             real_name: None,
             handle, quality, owner: owner.clone()
@@ -92,8 +98,8 @@ impl Swords {
         Ok((swords.len(), Some(example)))
     }
 
-    pub async fn draw(&self, owner: &String) -> Result<Sword, Box<dyn Error + Send + Sync>> {
-        let mut sword = self.roll_sword(owner, false);
+    pub async fn draw(&self, owner: &String, needle: bool) -> Result<Sword, Box<dyn Error + Send + Sync>> {
+        let mut sword = self.roll_sword(owner, false, needle);
         if let Quality::Artifact = sword.quality {
             let res = self.bestow_name(&mut sword);
             if res.is_err() || rand::random::<u8>() == 255 {
@@ -106,7 +112,7 @@ impl Swords {
             }
 
             while self.is_unique(&sword).await? {
-                sword = self.roll_sword(owner, true);
+                sword = self.roll_sword(owner, true, needle);
             }
         }
         Ok(sword)
@@ -256,6 +262,7 @@ enum SwordType {
     Katana,
     Zweihander,
     Dagger,
+    Needle,
 }
 
 impl SwordType {
@@ -273,7 +280,8 @@ impl SwordType {
             "katana" => Ok(SwordType::Katana),
             "zweihander" => Ok(SwordType::Zweihander),
             "dagger" => Ok(SwordType::Dagger),
-            _ => Err(format!("Unknownsword type: {}", string).into()),
+            "needle" => Ok(SwordType::Needle),
+            _ => Err(format!("Unknown sword type: {}", string).into()),
         }
     }
 }
@@ -354,6 +362,7 @@ impl fmt::Display for SwordType {
             SwordType::Katana => "katana",
             SwordType::Zweihander => "zweihander",
             SwordType::Dagger => "dagger",
+            SwordType::Needle => "needle",
         };
         write!(f, "{}", stype)
     }
@@ -464,7 +473,9 @@ impl fmt::Display for Sword {
                     self.material, self.sword_type),
         };
 
-        let handle = format!("It's handle is made out of {}", self.handle);
-        write!(f, "{}. {}.", sword, handle)
+        let handle = if self.sword_type != SwordType::Needle {
+            format!(". It's handle is made out of {}", self.handle)
+        } else {String::new()};
+        write!(f, "{}{}.", sword, handle)
     }
 }
