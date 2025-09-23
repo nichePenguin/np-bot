@@ -14,7 +14,7 @@ enum ParsedMessage {
     Armory,
     Hmmm,
     VoidStranger,
-    Ping,
+    Ping(String),
     Np(Vec<String>),
     Ignore,
     Exit
@@ -25,7 +25,7 @@ fn parse(input: &Message, ctx: &Context) -> (ParsedMessage, Option<String>, Opti
         let (parsed, key) = if text.starts_with("!rice") {
             (ParsedMessage::Rice, Some(FeatureKey::Rice))
         } else if text.starts_with("!ping") {
-            (ParsedMessage::Ping, Some(FeatureKey::Ping))
+            (ParsedMessage::Ping(text.clone()), Some(FeatureKey::Ping))
         } else if text.starts_with("!armory") {
             (ParsedMessage::Armory, Some(FeatureKey::Tarot))
         } else if text.starts_with("!draw") {
@@ -81,8 +81,9 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
             return Ok(true);
         },
         ParsedMessage::Ignore => {},
-        ParsedMessage::Ping => {
-            ctx.reply_or_send(input, "[💚] pong").await?
+        ParsedMessage::Ping(text) => {
+            let reply = format!("[💚] pong{}", &text[5..]);
+            ctx.reply_or_send(input, reply.as_str()).await?
         },
         ParsedMessage::VoidStranger => ctx.reply_or_send(input, "[💚] store.steampowered.com/app/2121980").await?,
         ParsedMessage::Rice => ctx.reply_or_send(input, "[💚] RICE BURNED TO CHARCOAL!!!").await?,
