@@ -121,7 +121,12 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
                 log::error!("Error drawing a card for {}: {}", input.source_nickname().unwrap_or("unknown"), e);
                 return Err(e);
             }
-            let (card, affinity) = card.map_err(|e| format!("Error drawing card: {}", e))?;
+
+            let (mut card, affinity) = card.map_err(|e| format!("Error drawing card: {}", e))?;
+            if username == "loweffortzzz" {
+                card = "0: The Fool".to_string();
+            }
+
             let color = get_message_tag(&input, "color").unwrap_or("#FFFFFF".to_owned());
             let user_id = get_message_tag(&input, "user-id").unwrap_or("unknown".to_owned());
             if let Err(e) = log_card(
