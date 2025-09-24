@@ -88,7 +88,7 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
             if rand::rng().random::<u8>() > 250 {
                 let username = get_message_tag(&input, "display-name").unwrap_or("unknown".to_owned());
                 let needle = ctx.swords.draw(&username, true).await.map_err(|e| e.to_string())?;
-                ctx.reply_or_send(input, format!("[💚] You rummage around in a haystack... finding a {}!", needle).as_str()).await?;
+                ctx.reply_or_send(input, format!("[💚] You rummage around in a haystack... finding {}!", needle).as_str()).await?;
                 log::info!("{}: {} found {}", channel, username, &needle);
                 ctx.swords.log(needle).await.map_err(|e| e.to_string())?;
             } else {
