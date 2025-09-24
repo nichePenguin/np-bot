@@ -476,6 +476,6 @@ impl fmt::Display for Sword {
         let handle = if self.sword_type != SwordType::Needle {
             format!(". It's handle is made out of {}", self.handle)
         } else {String::new()};
-        write!(f, "{}{}.", sword, handle)
+        write!(f, "{}{}", sword, handle)
     }
 }
