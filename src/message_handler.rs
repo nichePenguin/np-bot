@@ -25,7 +25,7 @@ fn parse(input: &Message, ctx: &Context) -> (ParsedMessage, Option<String>, Opti
     if let Command::PRIVMSG(channel, text) = &input.command {
         let (parsed, key) = if text.starts_with("!rice") {
             (ParsedMessage::Rice, Some(FeatureKey::Rice))
-        } else if text == "!needle" {
+        } else if text == "!needle" || text == "!haystack"{
             (ParsedMessage::Needle, Some(FeatureKey::Needle))
         } else if text.starts_with("!ping") {
             (ParsedMessage::Ping(text.clone()), Some(FeatureKey::Ping))
