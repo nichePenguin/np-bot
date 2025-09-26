@@ -460,11 +460,16 @@ impl std::cmp::PartialEq for Sword {
 
 impl fmt::Display for Sword {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let proper_article = if is_vowel(self.material.to_string().chars().nth(0)) {
+            "an"
+        } else {
+            "a"
+        };
         let sword = match self.quality {
-            Quality::Common => format!("a {} {}", self.material, self.sword_type),
-            Quality::WellCrafted => format!("a well-crafted -{} {}-", self.material, self.sword_type),
+            Quality::Common => format!("{} {} {}", proper_article, self.material, self.sword_type),
+            Quality::WellCrafted => format!("{} well-crafted -{} {}-", proper_article, self.material, self.sword_type),
             Quality::Fine => format!("a finely-crafted +{} {}+", self.material, self.sword_type),
-            Quality::Superior => format!("a *{} {}* of superior quality", self.material, self.sword_type),
+            Quality::Superior => format!("{} *{} {}* of superior quality", proper_article, self.material, self.sword_type),
             Quality::Exceptional => format!("an exceptional ≡{} {}≡", self.material, self.sword_type),
             Quality::Masterful => format!("a masterwork ☼{} {}☼", self.material, self.sword_type),
             Quality::Artifact =>
@@ -474,8 +479,17 @@ impl fmt::Display for Sword {
         };
 
         let handle = if self.sword_type != SwordType::Needle {
-            format!(". It's handle is made out of {}", self.handle)
+            format!(". Its handle is made out of {}", self.handle)
         } else {String::new()};
         write!(f, "{}{}", sword, handle)
+    }
+}
+
+const VOWELS: [char; 5] = ['a', 'e', 'i', 'o', 'u'];
+fn is_vowel(character: Option<char>) -> bool {
+    if let Some(character) = character {
+        VOWELS.iter().any(|&v| v == character)
+    } else {
+        false
     }
 }
