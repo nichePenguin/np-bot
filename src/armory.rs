@@ -36,11 +36,16 @@ impl Swords {
         };
         let material = rand::random::<Material>();
         let (sword_type, handle) = if needle {
-            (SwordType::Needle, material.clone())
+            (SwordType::Needle, Some(material.clone()))
         } else {
             let handle = match quality {
-                Quality::Common => Material::Wood,
-                _ => rand::random()
+                Quality::Common => None,
+                Quality::Artifact => Some(rand::random()),
+                _ => if rand::random::<u8>() > 128 {
+                    Some(rand::random())
+                } else {
+                    None
+                }
             };
             (rand::random(), handle)
         };
@@ -153,6 +158,7 @@ impl Swords {
 
 #[derive(Debug, PartialEq, Clone)]
 enum Material {
+    Rosewood,
     Plastic,
     Glass,
     Wood,
@@ -178,34 +184,36 @@ enum Material {
 }
 
 impl Material {
-    pub fn parse(string: Option<&str>) -> Result<Material, Box<dyn Error + Send + Sync>> {
+    pub fn parse(string: Option<&str>) -> Result<Option<Material>, Box<dyn Error + Send + Sync>> {
         if string.is_none() {
             return Err("Undefined material".into());
         }
         let string = string.unwrap();
         match string {
-            "plastic" => Ok(Material::Plastic),
-            "glass" => Ok(Material::Glass),
-            "wood" => Ok(Material::Wood),
-            "fine porcelain" => Ok(Material::Porcelain),
-            "iron" => Ok(Material::Iron),
-            "steel" => Ok(Material::Steel),
-            "silver" => Ok(Material::Silver),
-            "gold" => Ok(Material::Gold),
-            "electrum" => Ok(Material::Electrum),
-            "rose gold" => Ok(Material::RoseGold),
-            "lead" => Ok(Material::Lead),
-            "tin" => Ok(Material::Tin),
-            "copper" => Ok(Material::Copper),
-            "bronze" => Ok(Material::Bronze),
-            "brass" => Ok(Material::Brass),
-            "zinc" => Ok(Material::Zinc),
-            "mithril" => Ok(Material::Mithril),
-            "ruby" => Ok(Material::Ruby),
-            "sapphire" => Ok(Material::Sapphire),
-            "emerald" => Ok(Material::Emerald),
-            "diamond" => Ok(Material::Diamond),
-            "adamantine" => Ok(Material::Adamantine),
+            "none" => Ok(None),
+            "plastic" => Ok(Some(Material::Plastic)),
+            "glass" => Ok(Some(Material::Glass)),
+            "lost rosewood" => Ok(Some(Material::Rosewood)),
+            "wood" => Ok(Some(Material::Wood)),
+            "fine porcelain" => Ok(Some(Material::Porcelain)),
+            "iron" => Ok(Some(Material::Iron)),
+            "steel" => Ok(Some(Material::Steel)),
+            "silver" => Ok(Some(Material::Silver)),
+            "gold" => Ok(Some(Material::Gold)),
+            "electrum" => Ok(Some(Material::Electrum)),
+            "rose gold" => Ok(Some(Material::RoseGold)),
+            "lead" => Ok(Some(Material::Lead)),
+            "tin" => Ok(Some(Material::Tin)),
+            "copper" => Ok(Some(Material::Copper)),
+            "bronze" => Ok(Some(Material::Bronze)),
+            "brass" => Ok(Some(Material::Brass)),
+            "zinc" => Ok(Some(Material::Zinc)),
+            "mithril" => Ok(Some(Material::Mithril)),
+            "ruby" => Ok(Some(Material::Ruby)),
+            "sapphire" => Ok(Some(Material::Sapphire)),
+            "emerald" => Ok(Some(Material::Emerald)),
+            "diamond" => Ok(Some(Material::Diamond)),
+            "adamantine" => Ok(Some(Material::Adamantine)),
             _ => Err(format!("Unknown material: {}", string).into()),
         }
     }
@@ -374,6 +382,7 @@ impl fmt::Display for Material {
             Material::Plastic => "plastic",
             Material::Glass => "glass",
             Material::Wood => "wood",
+            Material::Rosewood => "lost rosewood",
             Material::Porcelain=> "fine porcelain",
             Material::Iron => "iron",
             Material::Steel => "steel",
@@ -401,7 +410,7 @@ impl fmt::Display for Material {
 #[derive(Debug, Clone)]
 pub struct Sword {
     material: Material,
-    handle: Material,
+    handle: Option<Material>,
     sword_type: SwordType,
     quality: Quality,
     name: Option<String>,
@@ -425,7 +434,7 @@ impl Sword {
     pub fn serialize(&self) -> String {
         [
             self.material.to_string(),
-            self.handle.to_string(),
+            self.handle.as_ref().map_or("none".to_string(), |h| h.to_string()),
             self.sword_type.to_string(),
             self.quality.to_mark().to_owned(),
             self.name.clone().unwrap_or("None".to_owned()),
@@ -437,7 +446,7 @@ impl Sword {
     pub fn deserialize(string: &str) -> Result<Sword, Box<dyn Error + Send + Sync>> {
         let mut data = string.split(SEPARATOR);
         Ok(Sword {
-            material: Material::parse(data.next())?,
+            material: Material::parse(data.next())?.ok_or("Missing sword material".to_string())?,
             handle: Material::parse(data.next())?,
             sword_type: SwordType::parse(data.next())?,
             quality: Quality::parse(data.next())?,
@@ -477,10 +486,13 @@ impl fmt::Display for Sword {
                     self.name.as_ref().unwrap(), self.real_name.as_ref().unwrap(),
                     self.material, self.sword_type),
         };
-
-        let handle = if self.sword_type != SwordType::Needle {
-            format!(". Its handle is made out of {}", self.handle)
-        } else {String::new()};
+        let handle = if self.sword_type == SwordType::Needle {
+            String::new()
+        } else if let Some(handle) = self.handle.as_ref() {
+            format!(". Its handle is adorned with {}", handle)
+        } else {
+            String::new()
+        };
         write!(f, "{}{}", sword, handle)
     }
 }
