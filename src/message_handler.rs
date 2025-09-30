@@ -85,12 +85,15 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
         },
         ParsedMessage::Ignore => {},
         ParsedMessage::Needle => {
-            if rand::rng().random::<u8>() > 250 {
+            let rand = rand::rng().random::<u8>();
+            if  rand > 250 {
                 let username = get_message_tag(&input, "display-name").unwrap_or("unknown".to_owned());
                 let needle = ctx.swords.draw(&username, true).await.map_err(|e| e.to_string())?;
                 ctx.reply_or_send(input, format!("[💚] You rummage around in a haystack... finding {}!", needle).as_str()).await?;
                 log::info!("{}: {} found {}", channel, username, &needle);
                 ctx.swords.log(needle).await.map_err(|e| e.to_string())?;
+            } else if rand == 16 {
+                ctx.reply_or_send(input, "[💚] You wummage awound in a haystawk... not windink any needuws... uwu...").await?
             } else {
                 ctx.reply_or_send(input, "[💚] You rummage around in a haystack... not finding any needles...").await?
             }
@@ -101,15 +104,15 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
         },
         ParsedMessage::VoidStranger => ctx.reply_or_send(input, "[💚] store.steampowered.com/app/2121980").await?,
         ParsedMessage::Rice => ctx.reply_or_send(input, "[💚] RICE BURNED TO CHARCOAL!!!").await?,
-        ParsedMessage::Hmmm => ctx.reply_or_send(input, "[💚] lcolonThinking").await?,
+        ParsedMessage::Hmmm => ctx.reply_or_send(input, "[💚] limesHmm").await?,
         ParsedMessage::Armory => {
             let username = get_message_tag(&input, "display-name").unwrap_or("unknown".to_owned());
             let (count, example) = ctx.swords.check(&username).await.map_err(|e| e.to_string())?;
             let message = if example.is_some() {
                 if count == 1 {
-                    format!("[💚] A single blade is kept safe in your armory, thus you gaze upon {}.", example.unwrap())
+                    format!("[💚] A single blade is kept safe in your armory: {}.", example.unwrap())
                 } else if count < 100 {
-                    format!("[💚] Your armory boasts {} swords, you set your eyes upon {}.", count, example.unwrap())
+                    format!("[💚] Your armory boasts {} swords, including such specimen as {}.", count, example.unwrap())
                 } else {
                     format!("[💚] Your armory groans beneath the weight of {} blades, yet you regard just one this time: {}.", count, example.unwrap())
                 }
