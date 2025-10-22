@@ -13,6 +13,7 @@ enum ParsedMessage {
     Tarot,
     Armory,
     Hmmm,
+    BugAd,
     VoidStranger,
     Needle,
     Ping(String),
@@ -25,6 +26,8 @@ fn parse(input: &Message, ctx: &Context) -> (ParsedMessage, Option<String>, Opti
     if let Command::PRIVMSG(channel, text) = &input.command {
         let (parsed, key) = if text.starts_with("!rice") {
             (ParsedMessage::Rice, Some(FeatureKey::Rice))
+        } else if text == "!sbob-ad" {
+            (ParsedMessage::BugAd, Some(FeatureKey::BugAd))
         } else if text == "!needle" || text == "!haystack"{
             (ParsedMessage::Needle, Some(FeatureKey::Needle))
         } else if text.starts_with("!ping") {
@@ -73,6 +76,7 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
     }
     let channel = channel.unwrap();
     match parsed {
+        ParsedMessage::BugAd => ctx.reply_or_send(input, "[💚] Want to submit YOUR bug on Small Book Of Bug? You CAN now! Go here -> https://pub.colonq.computer/~nichepenguin/kno/sbob.html").await?,
         ParsedMessage::Exit => {
             let username = get_message_tag(&input, "display-name").unwrap_or("unknown".to_owned());
             if username != "nichePenguin" {
@@ -138,7 +142,10 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
                 log::error!("Error drawing a card for {}: {}", input.source_nickname().unwrap_or("unknown"), e);
                 return Err(e);
             }
-            let (card, affinity) = card.map_err(|e| format!("Error drawing card: {}", e))?;
+            let (mut card, affinity) = card.map_err(|e| format!("Error drawing card: {}", e))?;
+            if username == "loweffortzzz" && channel == "lcolonq" {
+                card = "0: Fool".to_owned()
+            }
             let color = get_message_tag(&input, "color").unwrap_or("#FFFFFF".to_owned());
             let user_id = get_message_tag(&input, "user-id").unwrap_or("unknown".to_owned());
             if let Err(e) = log_card(

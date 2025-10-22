@@ -46,6 +46,7 @@ pub struct ChannelConfig {
 pub enum FeatureKey {
     Any,
     Full,
+    BugAd,
     Tarot,
     Hmmm,
     Rice,
@@ -72,6 +73,7 @@ fn parse_feature(string: &str) -> FeatureKey {
         "tarot" => FeatureKey::Tarot,
         "rice" => FeatureKey::Rice,
         "hmm" => FeatureKey::Hmmm,
+        "bug_ad" => FeatureKey::BugAd,
         "needle" => FeatureKey::Needle,
         "ping" => FeatureKey::Ping,
         "np" => FeatureKey::Np,
