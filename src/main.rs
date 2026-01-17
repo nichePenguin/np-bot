@@ -2,7 +2,9 @@ mod irc;
 mod config;
 mod message_handler;
 mod message_queue;
+mod clonk_stat;
 mod armory;
+mod sexpr;
 
 use std::{
     error::Error,
@@ -23,6 +25,19 @@ const CONFIG_FILE: &str = "ircconfig.json";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>>{
+    let url = format!("https://api.colonq.computer/api/user/{}", "lcolonq");
+    let response = reqwest::get(&url).await?.text().await?.replace("\\...", "");
+    let text = response.as_str();
+    println!("{:?}", text);
+    let parsed = sexpr::parse(text, true)?;
+    println!("{:?}", parsed);
+
+    if let sexpr::Value::List(vec) = parsed {
+        for val in vec {
+            println!("{:?}", val);
+        }
+    }
+    return Ok(());
     simple_logger::init_with_env().expect("failed to setup logging");
     let mut handle = connect().await;
     let mut attempts = 0;
