@@ -15,6 +15,7 @@ use crate::armory::Swords;
 use crate::config::{self, Config, FeatureKey};
 use crate::message_handler::handle;
 use crate::message_queue;
+use crate::gateway::Gateway;
 
 pub struct Context {
     queue: Arc<message_queue::MessageQueue>,
@@ -23,6 +24,7 @@ pub struct Context {
     pub tarot_history: PathBuf,
     pub noted_users: PathBuf,
     pub safe_word: String,
+    pub gateway: Arc<Gateway>,
     config: Arc<Mutex<Config>>
 }
 
@@ -89,8 +91,9 @@ pub async fn connect(
     tarot_history: PathBuf,
     noted_users: PathBuf,
     swords: Swords,
-    tarot: np_tarot::Tarot) -> Result<tokio::task::JoinHandle<Result<(), Box<dyn Error + Send + Sync>>>, Box<dyn Error>>
-{
+    tarot: np_tarot::Tarot,
+    gateway: Arc<Gateway>,
+) -> Result<tokio::task::JoinHandle<Result<(), Box<dyn Error + Send + Sync>>>, Box<dyn Error>> {
     let config = IrcConfig {
         nickname: Some("nichePenguin".to_owned()),
         server: Some("irc.twitch.tv".to_owned()),
@@ -131,6 +134,7 @@ pub async fn connect(
         tarot_history,
         noted_users,
         safe_word,
+        gateway: gateway,
         config: config_ref
     };
 

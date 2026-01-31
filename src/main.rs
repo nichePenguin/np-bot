@@ -5,11 +5,13 @@ mod message_queue;
 mod clonk_stat;
 mod armory;
 mod sexpr;
+mod gateway;
 
 use std::{
     error::Error,
     path::PathBuf,
     env::var,
+    sync::Arc
 };
 
 use np_utils::get_env_var;
@@ -18,26 +20,12 @@ use np_utils::get_env_var;
 const RETRY_DELAY_MS: u64 = 1000;
 const HISTORY_FILE: &str = "history.csv";
 const USERS_FILE: &str = "noted_users.txt";
-const SWORDS_FILE: &str = "swords.txt";
 const ELVEN_FILE: &str = "language_elven.txt";
 const AFFINITY_FILE: &str = "affinity.csv";
 const CONFIG_FILE: &str = "ircconfig.json";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>>{
-    let url = format!("https://api.colonq.computer/api/user/{}", "lcolonq");
-    let response = reqwest::get(&url).await?.text().await?.replace("\\...", "");
-    let text = response.as_str();
-    println!("{:?}", text);
-    let parsed = sexpr::parse(text, true)?;
-    println!("{:?}", parsed);
-
-    if let sexpr::Value::List(vec) = parsed {
-        for val in vec {
-            println!("{:?}", val);
-        }
-    }
-    return Ok(());
     simple_logger::init_with_env().expect("failed to setup logging");
     let mut handle = connect().await;
     let mut attempts = 0;
@@ -91,13 +79,22 @@ async fn connect() -> Result<tokio::task::JoinHandle<Result<(), Box<dyn Error + 
     let token = var("NPBOT_TOKEN")?;
     log::debug!("Reading safeword");
     let safe_word = var("NPBOT_SAFEWORD")?;
+    log::debug!("Reading gateway url");
+    let gateway = var("NPBOT_GATEWAY")?;
+    log::debug!("Reading gateway secret");
+    let gateway_secret = var("NPBOT_GATEWAY_KEY")?;
+    log::debug!("All secrets are red and kept safe");
 
     let affinity_file = get_env_var("NPBOT_AFFINITY", AFFINITY_FILE);
     let tarot_provider = np_tarot::Tarot::new(PathBuf::from(affinity_file))?;
 
+    let gateway = Arc::new(gateway::Gateway::init(gateway, gateway_secret)?);
+
     let elven = get_env_var("NPBOT_ELVEN", ELVEN_FILE);
-    let swords = get_env_var("NPBOT_SWORDS", SWORDS_FILE);
-    let sword_provider = armory::Swords::new(PathBuf::from(swords), PathBuf::from(elven)).await.map_err(|e| e.to_string())?;
+    let sword_provider = armory::Swords::new(
+        PathBuf::from(elven),
+        Arc::clone(&gateway),
+    ).await.map_err(|e| e.to_string())?;
 
     let history_file = get_env_var("NPBOT_HISTORY", HISTORY_FILE);
     let noted_users = get_env_var("NPBOT_USERS", USERS_FILE);
@@ -110,5 +107,7 @@ async fn connect() -> Result<tokio::task::JoinHandle<Result<(), Box<dyn Error + 
         PathBuf::from(history_file),
         PathBuf::from(noted_users),
         sword_provider,
-        tarot_provider).await
+        tarot_provider,
+        gateway,
+    ).await
 }

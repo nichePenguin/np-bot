@@ -1,31 +1,53 @@
 use std::fmt;
 use std::error::Error;
 use std::path::PathBuf;
-
-use std::io::{BufReader, BufRead, Write};
-use std::fs::{File, OpenOptions, self};
+use std::sync::Arc;
+use std::io::{BufReader, BufRead};
+use std::fs::File;
+use std::collections::HashMap;
 
 use cruet::to_title_case;
 use tokio::sync::RwLock;
+use json::object;
 use rand::{
     distr::{Distribution, StandardUniform},
+    seq::IndexedRandom,
     Rng
 };
+use crate::gateway;
 
 const LANG_SIZE: usize = 2222;
-const SEPARATOR: &str = "|";
 
 pub struct Swords {
-    swords: RwLock<PathBuf>,
+    cache: Arc<RwLock<Vec<Sword>>>,
+    cache_synced: bool,
     elven: PathBuf
 }
 
 impl Swords {
-    pub async fn new(swords: PathBuf, elven: PathBuf) -> Result<Self, Box<dyn Error + Send + Sync>> {
+    pub async fn new(elven: PathBuf, gateway: Arc<gateway::Gateway>) -> Result<Self, Box<dyn Error + Send + Sync>> {
+        let mut cache_synced = false;
+        let cache = match Self::init_cache(gateway).await {
+            Ok(cache) => {
+                cache_synced = true;
+                cache
+            },
+            Err(e) => {
+                log::error!("Failed to initialize cache: {}", e);
+                log::warn!("Continuing without local cache...");
+                Vec::new()
+            }
+        };
         Ok(Self {
             elven,
-            swords: RwLock::new(swords)
+            cache: Arc::new(RwLock::new(cache)),
+            cache_synced,
         })
+    }
+
+    async fn init_cache(gateway: Arc<gateway::Gateway>) -> Result<Vec<Sword>, Box<dyn Error + Send + Sync>>{
+        let params = HashMap::from([("all", "true".to_owned())]);
+        Self::get_swords(params, gateway).await
     }
 
     fn roll_sword(&self, owner: &String, guarantee_artifact: bool, needle: bool) -> Sword {
@@ -36,7 +58,7 @@ impl Swords {
         };
         let material = rand::random::<Material>();
         let (sword_type, handle) = if needle {
-            (SwordType::Needle, Some(material.clone()))
+            (SwordType::Needle, None)
         } else {
             let handle = match quality {
                 Quality::Common => None,
@@ -51,6 +73,7 @@ impl Swords {
         };
 
         Sword {
+            id: None,
             material,
             sword_type,
             name: None,
@@ -60,47 +83,64 @@ impl Swords {
     }
 
     async fn is_unique(&self, sword: &Sword) -> Result<bool, Box<dyn Error + Send + Sync>> {
-        let swords = self.swords.read().await;
-        for (n, sword_db) in fs::read_to_string(&*swords)?.lines().enumerate() {
-            match Sword::deserialize(sword_db) {
-                Ok(sword_db) => {
-                    if sword_db == *sword {
-                        return Ok(false)
-                    }
-                }
-                Err(e) => {
-                    log::error!("Error parsing sword at {}: {}", n, e);
-                }
+        for cached in self.cache.read().await.iter() {
+            if *cached == *sword {
+                return Ok(false)
             }
         }
         Ok(true)
     }
 
-    pub async fn log(&self, sword: Sword) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let swords = self.swords.write().await;
-        let mut file = OpenOptions::new()
-            .write(true)
-            .append(true)
-            .open(&*swords)?;
-
-        writeln!(file, "{}", sword.serialize()).map_err(|e| e.to_string().into())
+    pub async fn log(&self, sword: Sword, gateway: Arc<gateway::Gateway>) {
+        self.post_sword(&sword, gateway);
     }
 
-    pub async fn check(&self, owner: &String) -> Result<(usize, Option<Sword>), Box<dyn Error + Send + Sync>> {
-        let swords = {
-            let swords = self.swords.read().await;
-            fs::read_to_string(&*swords)?
-                .lines()
-                .filter_map(|line| Sword::deserialize(line).ok())
-                .filter(|sword| sword.owner == *owner)
-                .collect::<Vec<Sword>>()
+    fn post_sword(&self, sword: &Sword, gateway: Arc<gateway::Gateway>) {
+        let gateway = Arc::clone(&gateway);
+        let cache = Arc::clone(&self.cache);
+        let mut sword = sword.clone();
+        tokio::spawn(
+            async move {
+                if let Ok(Some(Some(id))) = gateway.post("/armory", sword.serialize()).await.map(|v| v.map(|v| v["id"].as_i64())) {
+                    sword.set_id(id)
+                } else {
+                    log::warn!("Failed to bestow an id onto a sword {}", sword)
+                }
+                cache.write().await.push(sword);
+            }
+        );
+    }
+
+    async fn get_swords(params: HashMap<&str, String>, gateway: Arc<gateway::Gateway>) -> Result<Vec<Sword>, Box<dyn Error + Send + Sync>>{
+        gateway.get("/armory", params).await.map(|json| {
+                if !json.is_array() {
+                    return Err("Result is not a valid json array".into())
+                }
+                return json.members().map(|s| Sword::deserialize(s)).collect()
+            }
+        ).map_err(|e| e.to_string())?
+    }
+
+    pub async fn check(&self, owner: &String, id: Option<i64>) -> (usize, Option<Sword>) {
+        let mut count = 0;
+        let sword = if let Some(id) = id {
+            self.cache.read().await
+                .iter()
+                .inspect(|_| count += 1)
+                .filter(|s| id == s.id.unwrap_or(-1))
+                .next()
+                .cloned()
+        } else {
+            self.cache.read().await
+                .iter()
+                .filter(|s| s.owner == *owner)
+                .inspect(|_| count += 1)
+                .collect::<Vec<&Sword>>()
+                .choose(&mut rand::rng())
+                .map(|s| *s)
+                .cloned()
         };
-        if swords.len() == 0 {
-            return Ok((0, None));
-        }
-        let index = rand::random_range(0..swords.len());
-        let example = swords[index].clone();
-        Ok((swords.len(), Some(example)))
+        (count, sword)
     }
 
     pub async fn draw(&self, owner: &String, needle: bool) -> Result<Sword, Box<dyn Error + Send + Sync>> {
@@ -186,11 +226,11 @@ enum Material {
 impl Material {
     pub fn parse(string: Option<&str>) -> Result<Option<Material>, Box<dyn Error + Send + Sync>> {
         if string.is_none() {
-            return Err("Undefined material".into());
+            return Ok(None)
         }
         let string = string.unwrap();
         match string {
-            "none" => Ok(None),
+            "None" => Ok(None),
             "plastic" => Ok(Some(Material::Plastic)),
             "glass" => Ok(Some(Material::Glass)),
             "lost rosewood" => Ok(Some(Material::Rosewood)),
@@ -271,6 +311,7 @@ enum SwordType {
     Zweihander,
     Dagger,
     Needle,
+    Tooth,
 }
 
 impl SwordType {
@@ -289,6 +330,7 @@ impl SwordType {
             "zweihander" => Ok(SwordType::Zweihander),
             "dagger" => Ok(SwordType::Dagger),
             "needle" => Ok(SwordType::Needle),
+            "tooth" => Ok(SwordType::Tooth),
             _ => Err(format!("Unknown sword type: {}", string).into()),
         }
     }
@@ -371,6 +413,7 @@ impl fmt::Display for SwordType {
             SwordType::Zweihander => "zweihander",
             SwordType::Dagger => "dagger",
             SwordType::Needle => "needle",
+            SwordType::Tooth => "tooth",
         };
         write!(f, "{}", stype)
     }
@@ -409,13 +452,14 @@ impl fmt::Display for Material {
 
 #[derive(Debug, Clone)]
 pub struct Sword {
+    id: Option<i64>,
     material: Material,
     handle: Option<Material>,
     sword_type: SwordType,
     quality: Quality,
     name: Option<String>,
     real_name: Option<String>,
-    owner: String
+    pub owner: String
 }
 
 impl Sword {
@@ -431,28 +475,32 @@ impl Sword {
         }
     }
 
-    pub fn serialize(&self) -> String {
-        [
-            self.material.to_string(),
-            self.handle.as_ref().map_or("none".to_string(), |h| h.to_string()),
-            self.sword_type.to_string(),
-            self.quality.to_mark().to_owned(),
-            self.name.clone().unwrap_or("None".to_owned()),
-            self.real_name.clone().unwrap_or("None".to_owned()),
-            self.owner.clone(),
-        ].join(SEPARATOR)
+    pub fn set_id(&mut self, id: i64) {
+        self.id = Some(id);
     }
 
-    pub fn deserialize(string: &str) -> Result<Sword, Box<dyn Error + Send + Sync>> {
-        let mut data = string.split(SEPARATOR);
+    pub fn serialize(&self) -> json::JsonValue {
+        object!(
+            material: self.material.to_string(),
+            handle: self.handle.clone().map(|m| m.to_string()),
+            sword_type: self.sword_type.to_string(),
+            quality: self.quality.to_mark(),
+            name: self.name.clone(),
+            real_name: self.real_name.clone(),
+            owner: self.owner.clone()
+        )
+    }
+
+    pub fn deserialize(json: &json::JsonValue) -> Result<Sword, Box<dyn Error + Send + Sync>> {
         Ok(Sword {
-            material: Material::parse(data.next())?.ok_or("Missing sword material".to_string())?,
-            handle: Material::parse(data.next())?,
-            sword_type: SwordType::parse(data.next())?,
-            quality: Quality::parse(data.next())?,
-            name: Self::parse_name(data.next())?,
-            real_name: Self::parse_name(data.next())?,
-            owner: data.next().ok_or("Undefined owner")?.to_owned()
+            id: Some(json["id"].as_i64().ok_or("No identifier")?),
+            material: Material::parse(json["material"].as_str())?.ok_or("Main material cannot be none")?,
+            handle: Material::parse(json["handle"].as_str())?,
+            sword_type: SwordType::parse(json["sword_type"].as_str())?,
+            quality: Quality::parse(json["quality"].as_str())?,
+            name: json["name"].as_str().map(str::to_owned),
+            real_name:json["real_name"].as_str().map(str::to_owned),
+            owner: json["owner"].as_str().map(str::to_owned).ok_or("Owner name is missing")?,
         })
     }
 

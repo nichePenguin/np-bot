@@ -17,8 +17,8 @@ pub fn parse_stats(data: &str) -> Result<HashMap<String, Vec<Value>>, Box<dyn st
         Err("Data is not a list of stats".into())
     }
 }
-
-pub fn format_stat(key: String, data: Vec<Value>) {
+/*
+pub fn format_stat(key: &str, data: Vec<Value>) {
     match key {
         "color" => one(data),
         "name" => one(data),
@@ -28,3 +28,4 @@ pub fn format_stat(key: String, data: Vec<Value>) {
         "shindaggers-knives" => 
     }
 }
+*/
