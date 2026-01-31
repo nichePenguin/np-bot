@@ -452,7 +452,7 @@ impl fmt::Display for Material {
 
 #[derive(Debug, Clone)]
 pub struct Sword {
-    id: Option<i64>,
+    pub id: Option<i64>,
     material: Material,
     handle: Option<Material>,
     sword_type: SwordType,

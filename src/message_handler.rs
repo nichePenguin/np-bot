@@ -34,9 +34,10 @@ fn parse(input: &Message, ctx: &Context) -> (ParsedMessage, Option<String>, Opti
             (ParsedMessage::Needle, Some(FeatureKey::Needle))
         } else if text.starts_with("!ping") {
             (ParsedMessage::Ping(text.clone()), Some(FeatureKey::Ping))
-        } else if text.starts_with("!armory") {
+        } else if text.starts_with("!armory ") {
             (ParsedMessage::Armory(text
                 .trim()
+                .replace('#', "")
                 .split_whitespace()
                 .filter(|s| *s != "!armory")
                 .next()
@@ -86,16 +87,14 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
     }
     let channel = channel.unwrap();
     match parsed {
-        ParsedMessage::BugAd => ctx.reply_or_send(input, "[💚] Want to submit YOUR bug on Small Book Of Bug? You CAN now! Go here -> https://pub.colonq.computer/~nichepenguin/kno/sbob.html").await?,
+        ParsedMessage::BugAd => ctx.reply_or_send(input, "[💚] Winter is upon most of the places, but I'm sure you know where the bugs are! Submit yours. Go here -> https://pub.colonq.computer/~nichepenguin/kno/sbob.html").await?,
         ParsedMessage::Exit => {
             let username = get_message_tag(&input, "display-name").unwrap_or("unknown".to_owned());
             if username != "nichePenguin" {
-                log::info!("Good one, {}!", username);
-                ctx.reply_or_send(input, "Good one!").await?
+                return Ok(true);
             } else {
-                ctx.reply_or_send(input, "Bye, boss!").await?
+                return Ok(false);
             }
-            return Ok(true);
         },
         ParsedMessage::Ignore => {},
         ParsedMessage::Needle => {
@@ -124,14 +123,19 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
             let username = get_message_tag(&input, "display-name").unwrap_or("unknown".to_owned());
             let (count, example) = ctx.swords.check(&username, id).await;
             let message = if let Some(example) = example {
-                if let Some(_) = id {
-                    format!("[💚] You peer into the unknown, and your psyche reaches {}'s blade: {}", example.owner, example)
-                } else if count == 1 {
-                    format!("[💚] A single blade is kept safe in your armory: {}.", example)
-                } else if count < 100 {
-                    format!("[💚] Your armory boasts {} swords, including such specimen as {}.", count, example)
+                let label = if let Some(id) = example.id {
+                    format!(" (#{})", id)
                 } else {
-                    format!("[💚] Your armory groans beneath the weight of {} blades, yet you regard just one this time: {}.", count, example)
+                    String::new()
+                };
+                if let Some(_) = id {
+                    format!("[💚] You peer into the unknown, and your psyche reaches {}'s blade: {}.", example.owner, example)
+                } else if count == 1 {
+                    format!("[💚] A single blade is kept safe in your armory: {}.{}", example, label)
+                } else if count < 100 {
+                    format!("[💚] Your armory boasts {} swords, including such specimen as {}.{}", count, example, label)
+                } else {
+                    format!("[💚] Your armory groans beneath the  weight of {} blades, yet you regard just one this time: {}.{}", count, example, label)
                 }
             } else if let Some(_) = id {
                 format!("[💚] Your peer into the unknown, but the blade you think of eludes you.")
