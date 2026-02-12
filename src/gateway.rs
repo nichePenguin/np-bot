@@ -31,7 +31,7 @@ impl Gateway {
     }
 
     pub async fn get_text(&self, path: &str, query_params: HashMap<&str, String>) -> Result<String, Box<dyn Error>> {
-        log::debug!("Get: {} {:?}", path, query_params);
+        //log::debug!("Get: {} {:?}", path, query_params);
         let mut url = self.base_url.join(path)?;
         {
             let mut query = url.query_pairs_mut();
@@ -48,7 +48,7 @@ impl Gateway {
                 Ok(resp) => {
                     match resp.text().await {
                         Ok(text) => {
-                            log::debug!("Got: {}", text);
+                            //log::debug!("Got: {}", text);
                             return Ok(text)
                         }
                         Err(e) => {
@@ -58,7 +58,7 @@ impl Gateway {
                     }
                 },
                 Err(e) => {
-                    log::error!("Get failed, boo womp");
+                    log::error!("Get failed: {}", e);
                     err = Some(e)
                 }
             }
@@ -72,7 +72,6 @@ impl Gateway {
     }
 
     pub async fn post(&self, path: &str, body: json::JsonValue) -> Result<Option<json::JsonValue>, Box<dyn Error>> {
-        log::debug!("Post: {} {:?}", path, body);
         let url = self.base_url.join(path)?;
         let mut attempts = 0;
         let mut err = None;
@@ -99,7 +98,7 @@ impl Gateway {
                 }
                 },
                 Err(e) => {
-                    log::error!("Post failed, boo womp");
+                    log::error!("Post failed");
                     err = Some(e)
                 }
             }

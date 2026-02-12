@@ -11,11 +11,12 @@ use std::{
     error::Error,
     path::PathBuf,
     env::var,
-    sync::Arc
+    sync::Arc,
+    time::SystemTime
 };
 
 use np_utils::get_env_var;
-
+use log::LevelFilter;
 
 const RETRY_DELAY_MS: u64 = 1000;
 const HISTORY_FILE: &str = "history.csv";
@@ -24,9 +25,29 @@ const ELVEN_FILE: &str = "language_elven.txt";
 const AFFINITY_FILE: &str = "affinity.csv";
 const CONFIG_FILE: &str = "ircconfig.json";
 
+fn setup_logger() -> Result<(), fern::InitError> {
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{} {} {}] {}",
+                humantime::format_rfc3339_seconds(SystemTime::now()),
+                record.level(),
+                record.target(),
+                message
+            ))
+        })
+        .level(log::LevelFilter::Debug)
+        .level_for("reqwest", LevelFilter::Off)
+        .level_for("hyper", LevelFilter::Off)
+        .chain(std::io::stdout())
+        .chain(fern::log_file("log.txt")?)
+        .apply()?;
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>>{
-    simple_logger::init_with_env().expect("failed to setup logging");
+    setup_logger()?;
     let mut handle = connect().await;
     let mut attempts = 0;
     let max_attempts = 5;

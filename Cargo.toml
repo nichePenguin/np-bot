@@ -17,7 +17,8 @@ json = "0.12.4"
 cruet = "0.15.0"
 
 log = "0.4.26"
-simple_logger = "5.0.0"
+fern = "0.7.1"
+humantime = "2.3.0"
 
 np_utils = { path = "../np-utils" } 
 np_tarot = { path = "../np-tarot" } 

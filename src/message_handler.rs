@@ -34,7 +34,7 @@ fn parse(input: &Message, ctx: &Context) -> (ParsedMessage, Option<String>, Opti
             (ParsedMessage::Needle, Some(FeatureKey::Needle))
         } else if text.starts_with("!ping") {
             (ParsedMessage::Ping(text.clone()), Some(FeatureKey::Ping))
-        } else if text.starts_with("!armory ") {
+        } else if text.split_whitespace().next().is_some_and(|s| s.starts_with("!armory")) {
             (ParsedMessage::Armory(text
                 .trim()
                 .replace('#', "")
@@ -90,7 +90,7 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
         ParsedMessage::BugAd => ctx.reply_or_send(input, "[💚] Winter is upon most of the places, but I'm sure you know where the bugs are! Submit yours. Go here -> https://pub.colonq.computer/~nichepenguin/kno/sbob.html").await?,
         ParsedMessage::Exit => {
             let username = get_message_tag(&input, "display-name").unwrap_or("unknown".to_owned());
-            if username != "nichePenguin" {
+            if username == "nichePenguin" {
                 return Ok(true);
             } else {
                 return Ok(false);
