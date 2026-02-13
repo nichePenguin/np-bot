@@ -16,10 +16,12 @@ use crate::config::{self, Config, FeatureKey};
 use crate::message_handler::handle;
 use crate::message_queue;
 use crate::gateway::Gateway;
+use crate::moon::Moon;
 
 pub struct Context {
     queue: Arc<message_queue::MessageQueue>,
     pub swords: Swords,
+    pub moon: Moon,
     pub tarot: np_tarot::Tarot,
     pub tarot_history: PathBuf,
     pub noted_users: PathBuf,
@@ -92,6 +94,7 @@ pub async fn connect(
     noted_users: PathBuf,
     swords: Swords,
     tarot: np_tarot::Tarot,
+    moon: Moon,
     gateway: Arc<Gateway>,
 ) -> Result<tokio::task::JoinHandle<Result<(), Box<dyn Error + Send + Sync>>>, Box<dyn Error>> {
     let config = IrcConfig {
@@ -129,6 +132,7 @@ pub async fn connect(
     let queue = Arc::new(message_queue::start(client, 850).await);
     let ctx = Context {
         queue,
+        moon,
         swords,
         tarot,
         tarot_history,

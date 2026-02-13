@@ -23,3 +23,5 @@ humantime = "2.3.0"
 np_utils = { path = "../np-utils" } 
 np_tarot = { path = "../np-tarot" } 
 
+chrono = "0.4.43"
+scraper = "0.25.0"

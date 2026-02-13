@@ -6,6 +6,7 @@ mod clonk_stat;
 mod armory;
 mod sexpr;
 mod gateway;
+mod moon;
 
 use std::{
     error::Error,
@@ -39,6 +40,8 @@ fn setup_logger() -> Result<(), fern::InitError> {
         .level(log::LevelFilter::Debug)
         .level_for("reqwest", LevelFilter::Off)
         .level_for("hyper", LevelFilter::Off)
+        .level_for("html5ever", LevelFilter::Off)
+        .level_for("selectors", LevelFilter::Off)
         .chain(std::io::stdout())
         .chain(fern::log_file("log.txt")?)
         .apply()?;
@@ -104,10 +107,14 @@ async fn connect() -> Result<tokio::task::JoinHandle<Result<(), Box<dyn Error + 
     let gateway = var("NPBOT_GATEWAY")?;
     log::debug!("Reading gateway secret");
     let gateway_secret = var("NPBOT_GATEWAY_KEY")?;
+    log::debug!("Reading moon info url");
+    let moon_url = var("NPBOT_MOON_URL")?;
     log::debug!("All secrets are red and kept safe");
 
     let affinity_file = get_env_var("NPBOT_AFFINITY", AFFINITY_FILE);
     let tarot_provider = np_tarot::Tarot::new(PathBuf::from(affinity_file))?;
+
+    let moon_provider = moon::init(moon_url)?;
 
     let gateway = Arc::new(gateway::Gateway::init(gateway, gateway_secret)?);
 
@@ -129,6 +136,7 @@ async fn connect() -> Result<tokio::task::JoinHandle<Result<(), Box<dyn Error + 
         PathBuf::from(noted_users),
         sword_provider,
         tarot_provider,
+        moon_provider,
         gateway,
     ).await
 }

@@ -45,9 +45,18 @@ impl Swords {
         })
     }
 
-    async fn init_cache(gateway: Arc<gateway::Gateway>) -> Result<Vec<Sword>, Box<dyn Error + Send + Sync>>{
-        let params = HashMap::from([("all", "true".to_owned())]);
-        Self::get_swords(params, gateway).await
+    async fn init_cache(gateway: Arc<gateway::Gateway>) -> Result<Vec<Sword>, Box<dyn Error + Send + Sync>> {
+        let mut total = Vec::new();
+        let mut page = 1;
+        loop {
+            page += 1;
+            let (mut swords, has_next) = Self::get_swords(page, Arc::clone(&gateway)).await?;
+            total.append(&mut swords);
+            if !has_next {
+                break
+            }
+        }
+        Ok(total)
     }
 
     fn roll_sword(&self, owner: &String, guarantee_artifact: bool, needle: bool) -> Sword {
@@ -111,12 +120,28 @@ impl Swords {
         );
     }
 
-    async fn get_swords(params: HashMap<&str, String>, gateway: Arc<gateway::Gateway>) -> Result<Vec<Sword>, Box<dyn Error + Send + Sync>>{
-        gateway.get("/armory", params).await.map(|json| {
-                if !json.is_array() {
-                    return Err("Result is not a valid json array".into())
+    async fn get_swords(
+        page: u32,
+        gateway: Arc<gateway::Gateway>
+    ) -> Result<(Vec<Sword>, bool), Box<dyn Error + Send + Sync>> {
+        let params = HashMap::from([
+            ("page", page.to_string()),
+            ("per_page", 1000.to_string())
+        ]);
+        gateway.get("/armory", params).await
+            .map(|json| {
+                if !json.is_object() ||
+                    !json.has_key("data") ||
+                    !json["data"].is_array() ||
+                    !json.has_key("meta") ||
+                    !json["meta"].is_object() ||
+                    !json["meta"].has_key("has_next") ||
+                    !json["meta"]["has_next"].is_boolean()
+                {
+                    return Err(format!("Result is not valid: {}", json).into())
                 }
-                return json.members().map(|s| Sword::deserialize(s)).collect()
+                let swords = json["data"].members().map(|s| Sword::deserialize(s)).collect::<Result<Vec<Sword>, _>>()?;
+                Ok((swords, json["meta"]["has_next"].as_bool().unwrap()))
             }
         ).map_err(|e| e.to_string())?
     }

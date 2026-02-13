@@ -12,6 +12,7 @@ const HISTORY_SEPARATOR: &str = ",";
 enum ParsedMessage {
     Rice,
     Tarot,
+    Moon,
     Armory(Option<i64>),
     Hmmm,
     Mmmm,
@@ -43,6 +44,8 @@ fn parse(input: &Message, ctx: &Context) -> (ParsedMessage, Option<String>, Opti
                 .next()
                 .map(|s| s.parse::<i64>().ok()).flatten()),
             Some(FeatureKey::Tarot))
+        } else if text.starts_with("!moon") {
+            (ParsedMessage::Moon, Some(FeatureKey::Moon))
         } else if text.starts_with("!draw") {
             (ParsedMessage::Tarot, Some(FeatureKey::Tarot))
         } else if text.starts_with("!voidstranger") {
@@ -97,6 +100,21 @@ pub async fn handle(input: Message, ctx: &Context) -> Result<bool, Box<dyn std::
             }
         },
         ParsedMessage::Ignore => {},
+        ParsedMessage::Moon => {
+            let info = ctx.moon.info().await?;
+            let reply = format!(
+                "[💚] [{}] [{} {}] Moon is {}, {} illumination aged {} days, angle {}, distance {} km",
+                info.emoji,
+                info.month,
+                info.day,
+                info.phase,
+                info.illumination.replace('\n', ""),
+                info.age,
+                info.angle,
+                info.distance);
+            log::info!("{}", reply);
+            ctx.reply_or_send(input, reply.as_str()).await?
+        },
         ParsedMessage::Needle => {
             let rand = rand::rng().random::<u8>();
             if  rand > 250 {

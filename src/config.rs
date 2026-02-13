@@ -48,6 +48,7 @@ pub enum FeatureKey {
     Full,
     BugAd,
     Tarot,
+    Moon,
     Hmmm,
     Mmmm,
     Rice,
@@ -72,6 +73,7 @@ fn parse_feature(string: &str) -> FeatureKey {
     match string {
         "full" => FeatureKey::Full,
         "tarot" => FeatureKey::Tarot,
+        "moon" => FeatureKey::Moon,
         "rice" => FeatureKey::Rice,
         "hmm" => FeatureKey::Hmmm,
         "mmm" => FeatureKey::Mmmm,
